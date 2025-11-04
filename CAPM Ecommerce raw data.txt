@@ -1,0 +1,545 @@
+Data-model
+
+
+namespace ecommerce;
+
+
+type UUID     : String(36);
+type Email    : String(100);
+type Phone    : String(15);
+type Price    : Decimal(10,2);
+type Quantity : Integer;
+type Postal   : String(10);
+type URL      : String(255);
+
+
+
+aspect AuditInfo {
+    CreatedAt : Timestamp;
+    UpdatedAt : Timestamp;
+}
+
+
+entity Customers {
+    key CustomerID   : UUID @defaultUUID;
+    FirstName        : String(50);
+    LastName         : String(50);
+    Email            : Email;
+    PhoneNumber      : Phone;
+    Address          : String(200);
+    City             : String(50);
+    Country          : String(50);
+    PostalCode       : Postal;
+    CreatedAt        : Timestamp;
+
+    // Composition (optional): List of orders placed by this customer
+    orders           : Composition of many Orders on orders.customer = $self;
+}
+
+
+entity Products : AuditInfo {
+    key ProductID    : UUID;
+    ProductName      : String(100);
+    Description      : String(500);
+    Category         : String(50);
+    Price            : Price;
+    StockQuantity    : Integer;
+    ImageURL         : URL;
+    isActive         : Boolean default true;
+}
+
+
+entity Orders : AuditInfo {
+    key OrderID      : UUID;
+    OrderDate        : DateTime;
+    TotalAmount      : Price;
+    Status           : String(20); 
+
+    // Association to customer who placed the order
+    customer         : Association to Customers;
+
+    // Composition to order items in this order
+    orderItems       : Composition of many OrderItems on orderItems.parent = $self;
+}
+
+
+
+entity OrderItems {
+    key OrderItemID  : UUID;
+    Quantity         : Quantity;
+    SubTotal         : Price;
+
+    // Association to the product being ordered
+    product          : Association to Products;
+
+    // Backlink to parent order
+    parent           : Association to Orders;
+}
+
+entity Admins : AuditInfo {
+    key AdminID      : UUID;
+    Username         : String(50);
+    Email            : Email;
+    Password         : String(100);
+    Role             : String(20); 
+}
+
+
+Service
+
+using ecommerce from '../db/data-model';
+
+@path: '/rithvi'
+@requires: 'authenticated-user'
+service EcommerceService {
+
+    // Entity projections
+    entity Customers   as projection on ecommerce.Customers;
+    entity Products    as projection on ecommerce.Products;
+    entity Orders      as projection on ecommerce.Orders;
+    entity OrderItems  as projection on ecommerce.OrderItems;
+    entity Admins      as projection on ecommerce.Admins;
+
+    // --- Custom Actions / Functions ---
+
+    // Place an order for a customer
+    action placeOrder(
+        customerID : UUID,
+        items      : array of {
+            productID : UUID;
+            quantity  : Integer;
+        }
+    ) returns {
+        orderID     : UUID;
+        totalAmount : Decimal(10,2);
+    };
+
+    // Update the status of an existing order
+    action updateOrderStatus(
+        orderID : UUID,
+        status  : String(20)
+    ) returns {
+        orderID : UUID;
+        status  : String(20);
+    };
+}
+
+Package.json
+
+{
+  "name": "Fedxecommerce",
+  "version": "1.0.0",
+  "description": "A simple CAP project.",
+  "dependencies": {
+    "@sap/cds": "^9",
+    "express": "^4",
+    "@sap/xssec": "^4"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^2",
+    "@sap/cds-dk": "^9",
+    "cds-plugin-ui5": "^0.13.0",
+    "rimraf": "^5.0.5",
+    "mbt": "^1.2.29"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "watch-project2": "cds watch --open project2/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "undeploy": "cf undeploy Fedxecommerce --delete-services --delete-service-keys --delete-service-brokers",
+    "build": "rimraf resources mta_archives && mbt build --mtar archive",
+    "deploy": "cf deploy mta_archives/archive.mtar --retries 1",
+    "watch-project3": "cds watch --open com.fedx.project3/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-project4": "cds watch --open project4/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-project5": "cds watch --open com.fedx.project5/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-project6": "cds watch --open com.fedx.project6/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-project7": "cds watch --open com.fedx.project7/index.html?sap-ui-xx-viewCache=false --livereload false"
+  },
+  "private": true,
+  "cds": {
+    "requires": {
+      "[production]": {
+        "auth": "xsuaa"
+      },
+      "db": {
+        "[development]": {
+          "kind": "sqlite",
+          "schema_evolution": "auto",
+          "credentials": {
+            "url": "fedx"
+          }
+        }
+      }
+    }
+  },
+  "auth": {
+    "[development]": {
+      "kind": "basic",
+      "users": {
+        "rithviroyal04s@gmai.com": {
+          "pasword": "Banglore@123"
+        }
+      }
+    }
+  }
+}
+
+
+HTTP File
+
+### get a product by ID-0001
+
+GET http://localhost:4004/rithvi/Products(ProductID ='prod-0001')
+Authorization: Basic cml0aHZpcm95YWwwNHNAZ21haS5jb206QmFuZ2xvcmVAMTIz
+Content-Type: application/json
+Accept: application/json
+
+### get a product by ID-0002
+
+GET http://localhost:4004/rithvi/Products(ProductID ='prod-0002')
+Authorization: Basic cml0aHZpcm95YWwwNHNAZ21haS5jb206QmFuZ2xvcmVAMTIz
+Content-Type: application/json
+Accept: application/json
+
+
+### get a product 
+
+GET http://localhost:4004/rithvi/Products
+Authorization: Basic cml0aHZpcm95YWwwNHNAZ21haS5jb206QmFuZ2xvcmVAMTIz
+Content-Type: application/json
+Accept: application/json
+
+### Update the price of a product
+PATCH http://localhost:4004/rithvi/Products(ProductID ='prod-0002')
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+{
+  "Price": 58.93
+}
+
+### Update the price of a product
+
+PATCH http://localhost:4004/rithvi/Products(ProductID ='prod-0001')
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+{
+  "Price": 49.93
+}
+
+### Create a new product
+POST http://localhost:4004/rithvi/Products
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+{
+  "ProductID": "Prod-003",
+  "ProductName": "Digital Camera",
+  "Description": "High-resolution digital camera with optical zoom",
+  "Category": "Electronics",
+  "Price": 499.99,
+  "StockQuantity": 20,
+  "ImageURL": "https://example.com/products/digital-camera.jpg",
+  "isActive": true,
+  "CreatedAt": "2025-10-16T12:00:00Z",
+  "UpdatedAt": "2025-10-16T12:00:00Z"
+}
+
+### Read the product
+POST http://localhost:4004/rithvi/Products
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+### Delete a product by ID
+DELETE http://localhost:4004/rithvi/Products(ProductID = 'prod-0002')
+Authorization: Basic cmloZHpcm95WHwhHNAZ21Has53Sj5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+### Create a new product
+POST http://localhost:4004/rithvi/Products
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+{
+  "ProductID": "Prod-004",
+  "ProductName": "Mobile",
+  "Description": "Nothing 3a pro with the pass key",
+  "Category": "Electronics",
+  "Price": 299.93,
+  "StockQuantity": 20,
+  "ImageURL": "https://example.com/products/Mobile.jpg",
+  "isActive": true,
+  "CreatedAt": "2025-10-23T12:00:00Z",
+  "UpdatedAt": "2025-10-23T12:00:00Z"
+}
+
+### Read the product
+POST http://localhost:4004/rithvi/Products
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+### Create a new product
+POST http://localhost:4004/rithvi/Products
+Authorization: Basic cmloZHpcm95YWwhHNAZ21Has5J5jb20cGmFuZZxv==
+Content-Type: application/json
+Accept: application/json
+
+{
+  "ProductID": "Prod-004",
+  "ProductName": "Vaccum cleaner",
+  "Description": "More cleaner and moew shiny",
+  "Category": "Electronics",
+  "Price":  210.98,
+  "StockQuantity": 20,
+  "ImageURL": "https://example.com/products/vaccum-cleaner.jpg",
+  "isActive": true,
+  "CreatedAt": "2025-10-16T12:00:00Z",
+  "UpdatedAt": "2025-10-16T12:00:00Z"
+}
+
+Data fields
+
+{
+                $Type : 'UI.DataField',
+                Label : 'PostalCode',
+                Value : PostalCode,
+            },
+
+{
+                $Type : 'UI.DataField',
+                Label : 'PhoneNumber',
+                Value : PhoneNumber,
+            },
+
+
+Annotations
+// add filter
+ 
+ annotate service.Customers with @(
+    UI.SelectionFields :[
+        CustomerID,
+        City
+    ]
+    
+ )
+
+
+Annotation.cds (OLD)
+
+
+using EcommerceService as service from '../../srv/service';
+annotate service.Customers with @(
+    UI.FieldGroup #GeneratedGroup : {
+        $Type : 'UI.FieldGroupType',
+        Data : [
+            {
+                $Type : 'UI.DataField',
+                Label : 'CustomerID',
+                Value : CustomerID,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'FirstName',
+                Value : FirstName,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'LastName',
+                Value : LastName,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Email',
+                Value : Email,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'PhoneNumber',
+                Value : PhoneNumber,
+            },
+            
+            {
+                $Type : 'UI.DataField',
+                Label : 'Address',
+                Value : Address,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'City',
+                Value : City,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Country',
+                Value : Country,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'PostalCode',
+                Value : PostalCode,
+            },
+
+            {
+                $Type : 'UI.DataField',
+                Label : 'CreatedAt',
+                Value : CreatedAt,
+            },
+        ],
+    },
+    UI.Facets : [
+        {
+            $Type : 'UI.ReferenceFacet',
+            ID : 'GeneratedFacet1',
+            Label : 'General Information',
+            Target : '@UI.FieldGroup#GeneratedGroup',
+        },
+    ],
+    UI.LineItem : [
+        {
+            $Type : 'UI.DataField',
+            Label : 'CustomerID',
+            Value : CustomerID,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'FirstName',
+            Value : FirstName,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'LastName',
+            Value : LastName,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Email',
+            Value : Email,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'PhoneNumber',
+            Value : PhoneNumber,
+        },
+    ],
+
+);
+
+
+
+
+Annotations.cds(NEW)
+
+using EcommerceService as service from '../../srv/service';
+
+annotate service.Customers with @(
+    UI.FieldGroup #GeneratedGroup : {
+        $Type : 'UI.FieldGroupType',
+        Data : [
+            {
+                $Type : 'UI.DataField',
+                Label : 'CustomerID',
+                Value : CustomerID,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'FirstName',
+                Value : FirstName,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'LastName',
+                Value : LastName,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Email',
+                Value : Email,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'PhoneNumber',
+                Value : PhoneNumber,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Address',
+                Value : Address,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'City',
+                Value : City,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'Country',
+                Value : Country,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'PostalCode',
+                Value : PostalCode,
+            },
+            {
+                $Type : 'UI.DataField',
+                Label : 'CreatedAt',
+                Value : CreatedAt,
+            },
+        ],
+    },
+
+    UI.Facets : [
+        {
+            $Type : 'UI.ReferenceFacet',
+            ID : 'GeneratedFacet1',
+            Label : 'General Information',
+            Target : '@UI.FieldGroup#GeneratedGroup',
+        },
+    ],
+
+    UI.LineItem : [
+        {
+            $Type : 'UI.DataField',
+            Label : 'CustomerID',
+            Value : CustomerID,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'FirstName',
+            Value : FirstName,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'LastName',
+            Value : LastName,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'Email',
+            Value : Email,
+        },
+        {
+            $Type : 'UI.DataField',
+            Label : 'PhoneNumber',
+            Value : PhoneNumber,
+        },
+    ],
+
+    // 👇 Add Filter Fields Here
+    UI.SelectionFields : [
+        CustomerID,
+        City
+    ]
+);
+
+HANA
+
+User id : DBADMIN
+Pass:Banglore@123
